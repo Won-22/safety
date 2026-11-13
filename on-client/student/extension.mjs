@@ -55,6 +55,19 @@ function node(tag, text) {
   return n;
 }
 
+// 입력으로 들어온 미지원 조치마다 비활성 버튼과 안내를 둔다. 눌러도 아무 요청도 보내지 않는다(이벤트 처리기가 없다). 목록이 비어 있으면 만들지 않는다.
+function unsupportedActions(list) {
+  const names = (Array.isArray(list) ? list : []).map((a) => (typeof a === 'string' ? a : a?.id ?? a?.action)).filter((a) => typeof a === 'string' && a);
+  if (!names.length) return [];
+  return [node('h5', '조치'), line('조치 실행 연결은 준비 중입니다. 아직 지원하지 않는 조치이며 어떤 요청도 보내지 않습니다.'), ...names.map((name) => {
+    const button = node('button', `${name} 미지원`);
+    button.type = 'button';
+    button.disabled = true;
+    button.setAttribute('aria-label', `${name} 미지원`);
+    return button;
+  })];
+}
+
 function eventDetail(e) {
   const box = node('div');
   box.setAttribute('data-student-event-detail', e.id);
@@ -63,6 +76,7 @@ function eventDetail(e) {
     node('h4', `${e.id} 상세`), line(`사건 ID: ${e.id}`), line(`종류: ${withRaw(KIND_TEXT, e.kind)}`), line(`앱: ${appText(e)}`),
     ...items('근거', e.evidence, '근거 없음'), ...items('규칙', e.rules, '규칙 없음'),
     node('h5', '상태'), line(`접속 판정: ${withRaw(ACCESS_STATUS, e.state?.access)}`), line(`세션: ${withRaw(SESSION_STATUS, e.state?.session)}`), line(`기기: ${withRaw(DEVICE_STATUS, e.state?.device)}`),
+    ...unsupportedActions(e.supportedActions),
   );
   return box;
 }
@@ -130,6 +144,74 @@ function eventsView({ status, mode, data, error } = {}) {
   return root;
 }
 
+const RETRY = '다시 시도는 위쪽 다시 불러오기 버튼을 직접 누르세요. 자동으로 다시 요청하지 않습니다.';
+
+// 자료 하나(기기·세션)를 불러오는 중 / 빈 목록 / 실패 / 목록으로 나눠 그린다. 실패와 빈 목록은 문장이 다르다.
+function statusSection(title, resource, scope, empty, row) {
+  const box = node('section');
+  box.append(node('h4', title), line(scope));
+  if (MODE[resource?.mode]) box.append(line(`자료 상태: ${MODE[resource.mode]}`));
+  if (resource?.status === 'loading') box.append(line('불러오는 중'));
+  else if (resource?.status === 'error') {
+    const timeout = /TIMEOUT/u.test(String(resource.error?.code));
+    box.append(line(`${title}을(를) 불러오지 못했습니다${timeout ? '(시간 초과)' : ''}: ${resource.error?.message ?? '확인 불가'}`), line(RETRY));
+  } else if (resource?.status === 'ok' && Array.isArray(resource.data)) box.append(...(resource.data.length ? resource.data.map(row) : [line(empty)]));
+  else box.append(line('확인 불가'));
+  return box;
+}
+
+// 도움 요청에 쓸 값은 이 여섯 개만 고른다. 그 밖의 값(설정·인증 정보 등)은 화면에도 복사본에도 넣지 않는다.
+function helpFields(data) {
+  return [
+    ['요청 ID', data?.requestId], ['구성 요소', data?.component], ['버전', data?.version], ['확인 시각', data?.checkedAt],
+    ['엔진 모드', data?.engine?.mode], ['엔진 코드', data?.engine?.code],
+  ].map(([name, value]) => `${name}: ${typeof value === 'string' || typeof value === 'number' ? String(value).slice(0, 200) : '확인 불가'}`);
+}
+
+function helpSection(diagnostics) {
+  const box = node('section');
+  box.append(node('h4', '도움정보'));
+  const note = line('');
+  const copy = node('button', '도움정보 복사');
+  copy.type = 'button';
+  copy.setAttribute('aria-label', '도움정보 복사');
+  copy.disabled = true;
+  if (diagnostics?.status === 'loading') box.append(line('도움정보를 불러오는 중'));
+  else if (diagnostics?.status === 'error') box.append(line(`도움정보를 불러오지 못했습니다: ${diagnostics.error?.message ?? '확인 불가'}`), line(RETRY));
+  else if (diagnostics?.status === 'ok' && diagnostics.data) {
+    const fields = helpFields(diagnostics.data);
+    box.append(...fields.map(line));
+    copy.disabled = false;
+    // 사용자가 누를 때만 복사한다. 어디로도 전송하지 않는다.
+    copy.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(fields.join('\n'));
+        note.textContent = '도움정보를 클립보드에 복사했습니다.';
+      } catch {
+        note.textContent = '복사하지 못했습니다. 위 내용을 직접 선택해 복사하세요.';
+      }
+    });
+  } else box.append(line('도움정보를 아직 조회하지 않았습니다.'));
+  box.append(line('이 정보는 도움 요청에 쓰도록 복사하는 것이며, 누를 때만 복사하고 어디에도 전송하지 않습니다.'), copy, note);
+  return box;
+}
+
+function statusView({ devices, sessions, notifications, diagnostics, mode } = {}) {
+  const root = node('div');
+  root.append(node('h3', '기기·세션·알림·도움정보'));
+  if (MODE[mode]) root.append(line(`자료 상태: ${MODE[mode]}`));
+  root.append(
+    statusSection('기기', devices, '등록된 내 기기(회수되지 않은 것, 최대 100개)입니다.', '등록된 기기가 없습니다', (d) => line(`${d?.label || '이름 없음'}(${d?.id ?? '-'}) · ${withRaw(DEVICE_STATUS, d?.status)}`)),
+    statusSection('세션', sessions, '현재 검증된 연결 한 개만 조회합니다. 과거 세션 전체 목록이 아닙니다.', '현재 연결이 없습니다', (s) => line(`${s?.id ?? '-'} · ${withRaw(SESSION_STATUS, s?.status)}`)),
+  );
+  const alerts = node('section');
+  alerts.append(node('h4', '알림'));
+  const list = Array.isArray(notifications) ? notifications : [];
+  alerts.append(...(list.length ? list.map((n) => line(`자료: ${n?.resource ?? '확인 불가'} · 코드: ${n?.code ?? '확인 불가'} · ${n?.message ?? ''}`)) : [line('주의할 알림이 없습니다')]));
+  root.append(alerts, helpSection(diagnostics));
+  return root;
+}
+
 export function createStudentView() {
   return {
     renderIdentity({ me, devices, sessions } = {}) {
@@ -156,7 +238,7 @@ export function createStudentView() {
       return root;
     },
     renderEvents(input) { return eventsView(input); },
-    renderStatus() { return '학생 구현 대기: 기기·세션·알림과 연결 점검 상태를 구분하세요.'; },
+    renderStatus(input) { return statusView(input); },
     renderVulnerabilities() { return '학생 구현 대기: 정확한 설치 버전·OSV 출처·조회 시각·부분 결과·조회 실패를 구분하세요.'; },
     renderAiConnection() { return '학생 구현 대기: 모델 응답 점검과 실제 사건 설명을 구분하고 AI 오류·취소·수동 복구를 안내하세요.'; },
     renderExplanation() { return '학생 구현 대기: 선택한 사건의 근거·규칙·현재 상태와 AI 설명을 연결하세요. 제안은 자동 실행하지 않습니다.'; },
