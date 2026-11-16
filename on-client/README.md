@@ -25,3 +25,14 @@ npm start도 같은 서버를 켭니다. 기본 실행은 실제 회사 시스�
 - 오류 코드별 해결: docs/CONNECTION_TROUBLESHOOT.md
 - 시작 틀 업데이트(내 파일 보존): docs/STARTER_UPDATE.md
 - 실제 회사 시스템(SDP)·앱 안 AI 연결은 담당자가 따로 안내할 때만 씁니다: docs/SDP_HOST_CONNECTION.md, docs/AI_SETUP_GUIDE.md. 이 연결은 앱을 처음 켜고 13~16단계 화면을 만들거나 공식 AI 코드 판정을 받기 위한 전제 조건은 아닙니다. 다만 17단계 이후의 실제 연결과 새 환경 재현은 해당 단계의 기준에 따라 따로 확인합니다.
+
+
+## 학생 문서: 튀김면 보안 Agent
+
+위 내용은 제공 시작 틀의 설명입니다. 아래는 학생이 덧붙인 부분이며, 위의 제공 내용은 고치지 않았습니다. 자세한 실행 절차·구성도·오류별 확인 순서·미확인 기능은 [docs/STUDENT_RUNBOOK.md](docs/STUDENT_RUNBOOK.md)에 있습니다.
+
+- **목적:** 내 로그인 사용자·기기·세션, 업무 앱 접근 판정, 접속 기록과 XDR 경보, 설치 패키지의 알려진 취약점 조회 결과를 한 화면에서 구분해 보여 주는 보안 Agent(앱 이름 튀김면)입니다.
+- **기능:** 학생이 `student/extension.mjs`에 구현한 화면 함수 8개(`renderIdentity`, `renderDecision`, `renderEvents`, `renderStatus`, `renderAiConnection`, `renderExplanation`, `renderAction`, `renderVulnerabilities`)입니다. 조치 집행과 악성코드 검사는 하지 않습니다.
+- **구성:** 브라우저(`http://127.0.0.1:5189`) → 로컬 앱 서버(`src/server.mjs`) → 접근 제어·XDR 시스템 연결 / AI 게이트웨이 / OSV 조회. 제공 코드(`public/`, `src/`, `tools/`, `vendor/`)와 학생 코드(`student/extension.mjs`)의 경계는 설명서 6장에 표로 있습니다.
+- **지원 환경과 버전:** 시작 틀 0.2.21, Node.js 22~24(수업 기준 24.19.0), Windows 11 + Windows PowerShell 5.1에서 확인했습니다. Node.js 25 이상과 다른 운영체제는 지원하지 않거나 확인하지 않았습니다.
+- **실행:** `on-client` 폴더에서 `powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\start-alekov.ps1` 을 실행하고 `http://127.0.0.1:5189` 를 엽니다. 기본 실행은 실제 회사 시스템에 연결되지 않은 상태이며, 연결·AI 설명·조치 집행·패키지 조회의 실제 결과는 확인하지 못했습니다(설명서 8장).
