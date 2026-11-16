@@ -34,6 +34,6 @@ npm start도 같은 서버를 켭니다. 기본 실행은 실제 회사 시스�
 - **목적:** 내 로그인 사용자·기기·세션, 업무 앱 접근 판정, 접속 기록과 XDR 경보, 설치 패키지의 알려진 취약점 조회 결과를 한 화면에서 구분해 보여 주는 보안 Agent(앱 이름 튀김면)입니다.
 - **기능:** 학생이 `student/extension.mjs`에 구현한 화면 함수 8개(`renderIdentity`, `renderDecision`, `renderEvents`, `renderStatus`, `renderAiConnection`, `renderExplanation`, `renderAction`, `renderVulnerabilities`)입니다. 조치 집행과 악성코드 검사는 하지 않습니다.
 - **구성:** 브라우저(`http://127.0.0.1:5189`) → 로컬 앱 서버(`src/server.mjs`) → 접근 제어·XDR 시스템 연결 / AI 게이트웨이 / OSV 조회. 제공 코드(`public/`, `src/`, `tools/`, `vendor/`)와 학생 코드(`student/extension.mjs`)의 경계는 설명서 6장에 표로 있습니다.
-- **지원 환경과 버전:** 시작 틀 0.2.21, Node.js 22~24(수업 기준 24.19.0), Windows 11 + Windows PowerShell 5.1에서 확인했습니다. Node.js 25 이상과 다른 운영체제는 지원하지 않거나 확인하지 않았습니다.
+- **지원 환경과 버전:** 시작 틀 0.2.21. 실제로 실행해 확인한 환경은 **Node.js 24.19.0**(수업 기준)과 Windows 11 + Windows PowerShell 5.1뿐입니다. 실행 도구(`tools/start-alekov.ps1`)가 허용하는 Node.js 범위는 22~24이지만, 22와 23은 이 PC에서 실행해 확인하지 않았습니다. Node.js 25 이상(v26.8.1에서 실행 도구가 멈춤을 확인)과 다른 운영체제는 지원하지 않거나 확인하지 않았습니다.
 - **실행:** `on-client` 폴더에서 `powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\start-alekov.ps1` 을 실행하고 `http://127.0.0.1:5189` 를 엽니다. 기본 실행은 실제 회사 시스템에 연결되지 않은 상태이며, 연결·AI 설명·조치 집행·패키지 조회의 실제 결과는 확인하지 못했습니다(설명서 8장).
 - **릴리스·재현 기록(22단계):** 같은 커밋을 새 빈 폴더에서 실행한 재현 기록, 13~21단계 결과 표, 데이터 보존 계획은 [docs/STUDENT_RELEASE_RECORD.md](docs/STUDENT_RELEASE_RECORD.md)에 있습니다. 이 버전은 검증 중인 버전입니다.

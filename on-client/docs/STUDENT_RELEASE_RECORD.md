@@ -89,7 +89,7 @@ git diff --name-only 1ea8e33045759451545a8429a7e5c60cfbc50f2b <제출 커밋>
 |---|---|---|
 | 소스 전체 | GitHub 저장소(`git clone`) | `on-client/` 안에 앱·학생 코드·문서가 모두 있음 |
 | 설정 예시 | `on-client/.env.example` | 비밀 없는 설정(`ON_PORT`, `ON_ENGINE_ADAPTER`, `ON_AI_MODEL`, `ON_PROJECT_DIRECTORY`, `ON_APPROVED_PUBLIC_PACKAGES`). 경로는 상대 경로(`./student/engine-adapter.mjs`) |
-| 설치 절차 | `docs/STUDENT_RUNBOOK.md` 5장 | 설치할 패키지가 없음. Node 22~24와 PowerShell만 필요 |
+| 설치 절차 | `docs/STUDENT_RUNBOOK.md` 5장 | 설치할 패키지가 없음. Node.js 24.19.0(실제 확인한 버전, 실행 도구는 22~24 허용이나 22·23은 확인하지 않음)과 PowerShell만 필요 |
 | Node 24.19.0 | 공식 사이트 | 이 PC의 위치에 의존하지 않음. 풀어 둔 폴더를 PATH 앞에 두는 한 줄만 사용 |
 
 - 옮기지 않는 것: 원래 PC의 계정 연결 설정 폴더(사용자 폴더 아래 `.aleph-keshev-…`), 인증·설정 파일, 키·토큰. 새 환경에서 앱 화면의 계정 연결과 AI 승인을 다시 합니다.
@@ -153,7 +153,7 @@ AI 원문 검토는 실행이 성공했다는 증명이 아닙니다.
 | 항목 | 값 |
 |---|---|
 | 앱 버전 | 시작 틀 0.2.21. 학생 구현은 22단계 시점의 검증 중인 버전 |
-| 지원 환경 | Windows 11, Windows PowerShell 5.1, Node.js 24.19.0(실행 도구는 22~24 허용), Git 2.55 |
+| 지원 환경 | Windows 11, Windows PowerShell 5.1, Node.js 24.19.0(실제 확인한 버전. 실행 도구는 22~24를 허용하지만 22·23은 확인하지 않음), Git 2.55 |
 | 지원하지 않거나 확인하지 않은 환경 | Node.js 25 이상(실행 도구가 멈춤, 실제 확인), Windows 외 운영체제, Edge 외 브라우저 확인 |
 | 미해결·누락 | 실제 회사 시스템(SDP) 연결과 실제 값 / 계정·AI 승인 완료와 AI 연결 `ok` 화면 / 실제 AI 사건 설명 성공 / 실제 보안 조치 집행·결과 재조회(19단계 실집행은 준비되지 않음) / 실제 패키지 조회(`complete`, `partial`) / `.gitignore` 없음 / 모의 입력 점검 스크립트를 프로젝트에 포함하지 않아 다른 사람이 같은 점검을 다시 할 수 없음 / 단계별 서버 판정 결과 일부 미확인 |
 
