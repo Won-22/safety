@@ -225,7 +225,7 @@ const AI_CAUSES = [
   ['쓸 수 있는 모델 없음', '담당자에게 모델 허용 설정 확인을 요청하세요.', ['ON_AI_MODEL_LIST_EMPTY', 'MODEL_NOT_CONFIGURED']],
 ];
 const SAFE_CODE = /^[A-Za-z0-9_]{1,64}$/u;
-const safeCode = (error) => (SAFE_CODE.test(String(error?.code)) ? String(error.code) : '확인 불가');
+const safeCode = (error) => (typeof error?.code === 'string' && SAFE_CODE.test(error.code) ? error.code : '확인 불가');
 const safeMessage = (error) => (typeof error?.message === 'string' && error.message ? error.message.slice(0, 200) : '확인 불가');
 
 function aiFailureLines(title, error) {
@@ -311,6 +311,57 @@ function explanationView({ event, explanation, checkedAt } = {}) {
   return root;
 }
 
+// 조치 제안·사람 확인·서버 접수·실제 효과 확인을 상태마다 다른 문장으로 구분한다. 버튼과 요청은 만들지 않고(제공 화면 버튼을 쓴다), 입력값만 읽어 새 값이 오면 이전 표시가 남지 않는다.
+const ACTION_STATUS = {
+  idle: '아직 미실행(idle)', loading: '조치 준비 또는 결과 조회 중(loading)', prepared: '준비됨·미실행(prepared)', executing: '서버에 전달 중(executing)',
+  pending: '서버 접수·처리 중(pending)', succeeded: '효과 확인(succeeded)', denied: '거절(denied)', failed: '실패(failed)',
+  unknown: '결과 불명(unknown)', expired: '확인 기한 지남(expired)', error: '요청 처리 안 됨(error)',
+};
+const RESULT_ONLY = '결과 재조회는 제공 화면의 「연동 시스템 결과만 재조회」 버튼을 사용자가 직접 누릅니다.';
+const NO_RESEND = '같은 조치를 다시 전송하지 마세요(중복 전송 방지).';
+const shortText = (v) => (typeof v === 'string' || typeof v === 'number' ? String(v).slice(0, 200) : null);
+
+function actionContext({ event, actionId, target, receipt }) {
+  const ids = (Array.isArray(event?.evidence) ? event.evidence : []).map((x) => shortText(x?.id)).filter(Boolean);
+  return [
+    ['사건 ID', shortText(event?.id)], ['근거 ID', ids.length ? ids.join(', ') : null], ['조치(actionId)', shortText(actionId)],
+    ['대상(target.id)', shortText(target?.id)], ['대상 세대(generation)', shortText(target?.generation)],
+    ['요청 ID(requestId)', shortText(receipt?.requestId)], ['접수 번호(receiptId)', shortText(receipt?.receiptId)], ['버전(version)', shortText(receipt?.version)],
+  ].filter(([, value]) => value !== null).map(([name, value]) => line(`${name}: ${value}`));
+}
+
+function actionView(input = {}) {
+  const { status, event, receipt, observation, message, confirmationExpiresAt, error } = input;
+  const root = node('div');
+  root.append(node('h3', '보안 조치 상태'));
+  // succeeded라도 연동 시스템이 효과를 관측(effectApplied: true)하지 않았으면 결과 불명으로 본다.
+  const effect = status === 'succeeded' && observation?.effectApplied === true;
+  const shown = Object.hasOwn(ACTION_STATUS, status) && (status !== 'succeeded' || effect) ? status : 'unknown';
+  root.append(line(`상태: ${ACTION_STATUS[shown]}`));
+  const notes = {
+    idle: ['연동 시스템이 지원하는 조치가 없으면 조치 준비 버튼이 나오지 않는 것이 정상입니다. 이 화면은 조치를 실행하지 않습니다.'],
+    loading: ['조치 준비 또는 결과 조회가 진행 중입니다. 결과는 아직 없습니다.'],
+    prepared: [`확인 기한: ${shortText(confirmationExpiresAt) ?? '확인 불가'}`, '아직 실행되지 않았습니다. 제공 화면에서 대상과 조치를 확인한 뒤 「대상과 조치를 확인했으며 집행합니다」를 눌러야 전달됩니다.'],
+    executing: ['서버에 전달 중입니다. 결과가 아직 없습니다.', NO_RESEND],
+    pending: ['서버가 받아 처리 중입니다. 서버가 받았다는 응답(ACK)은 효과가 아닙니다. 결과는 아직 확인되지 않았습니다.', NO_RESEND, RESULT_ONLY],
+    succeeded: [`관측 시각: ${shortText(observation?.observedAt) ?? '확인 불가'}`, 'effectApplied: true', `접수 번호(receiptId): ${shortText(receipt?.receiptId) ?? '확인 불가'}`],
+    denied: [`연동 시스템이 거절했습니다: ${shortText(message) ?? '확인 불가'}`],
+    failed: [`연동 시스템이 실패로 응답했습니다: ${shortText(message) ?? '확인 불가'}`],
+    unknown: [status === 'succeeded' ? 'succeeded로 전달됐지만 연동 시스템의 효과 관측이 확인되지 않아 결과 불명으로 처리합니다.' : null,
+      '효과가 없다고도 성공했다고도 판단하지 않습니다.', RESULT_ONLY].filter(Boolean),
+    expired: ['확인 기한이 지났습니다. 조치는 전달되지 않았습니다. 제공 화면에서 다시 준비하세요.'],
+    error: [`코드: ${safeCode(error)} · ${safeMessage(error?.message ? error : { message })}`, '요청이 처리되지 않았습니다.'],
+  };
+  root.append(...notes[shown].map(line));
+  if (shown !== 'idle' && shown !== 'loading') root.append(...actionContext(input));
+  // 속성은 사건과 요청 번호가 있는 화면에만 붙인다. 속성만으로는 의미가 없고, 위 글자가 실제 상태를 말한다.
+  if (!['idle', 'loading', 'error'].includes(shown)) {
+    if (event?.id) root.setAttribute('data-student-action-event', event.id);
+    if (receipt?.requestId) root.setAttribute('data-student-action-request', receipt.requestId);
+  }
+  return root;
+}
+
 export function createStudentView() {
   return {
     renderIdentity({ me, devices, sessions } = {}) {
@@ -341,6 +392,6 @@ export function createStudentView() {
     renderVulnerabilities() { return '학생 구현 대기: 정확한 설치 버전·OSV 출처·조회 시각·부분 결과·조회 실패를 구분하세요.'; },
     renderAiConnection(input) { return aiConnectionView(input); },
     renderExplanation(input) { return explanationView(input); },
-    renderAction() { return '학생 구현 대기: 현재 사건·조치·실제 대상·사람 확인·ACK와 원천 효과·unknown을 구분하세요.'; },
+    renderAction(input) { return actionView(input); },
   };
 }
