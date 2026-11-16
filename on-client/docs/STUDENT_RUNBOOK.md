@@ -37,7 +37,8 @@
 작업 위치는 두 곳입니다. **앱 폴더**와 **Git 최상위 폴더**가 다릅니다.
 
 ```text
-C:\Users\User\AppData\Local\ALEPH\Workbench\projects\방어전\      ← Git 최상위 폴더(커밋·push는 여기서)
+<프로젝트 폴더>\                                                   ← Git 최상위 폴더(커밋·push는 여기서)
+                                                                   (이 PC의 예: 워크벤치가 만든 ...\projects\방어전)
 └─ on-client\                                                    ← 앱 폴더(앱 실행은 여기서)
    ├─ README.md, package.json, .env.example                      (제공)
    ├─ docs\STUDENT_RUNBOOK.md                                    (학생 작성, 이 문서)
@@ -133,11 +134,13 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\start-alekov.ps1
 
 ### 5.4 Node 24가 따로 필요할 때(이 PC에서 쓴 방법)
 
-이 PC의 Node는 v26.8.1이라 실행 도구가 멈췄습니다(실제 확인). 공식 사이트(`https://nodejs.org/dist/v24.19.0/`)의 Windows x64 압축 파일을 받아 `SHASUMS256.txt` 와 SHA-256이 같은 것을 확인한 뒤 `C:\node24` 에 풀어서 썼습니다. 이 PowerShell 창에서만 먼저 쓰게 하는 한 줄입니다. 창을 닫으면 원래대로 돌아갑니다.
+이 PC의 Node는 v26.8.1이라 실행 도구가 멈췄습니다(실제 확인). 공식 사이트(`https://nodejs.org/dist/v24.19.0/`)의 Windows x64 압축 파일을 받아 `SHASUMS256.txt` 와 SHA-256이 같은 것을 확인한 뒤 원하는 폴더에 풀어서 썼습니다(이 PC에서는 `C:\node24`, 이 위치는 필수가 아님). 이 PowerShell 창에서만 먼저 쓰게 하는 한 줄입니다. 창을 닫으면 원래대로 돌아갑니다.
 
 ```powershell
-$env:Path = "C:\node24;" + $env:Path
+$env:Path = "<Node 24를 푼 폴더>;" + $env:Path
 ```
+
+(`<Node 24를 푼 폴더>` 는 `node.exe` 가 들어 있는 폴더입니다.)
 
 `node --version` 이 `v24.19.0` 이 나오면 5.3의 명령을 실행합니다.
 
