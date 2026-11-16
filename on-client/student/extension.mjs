@@ -362,6 +362,62 @@ function actionView(input = {}) {
   return root;
 }
 
+// 설치된 패키지의 정확한 버전을 OSV 조회 결과와 함께 보여 준다. 조회 실패·미조회는 "취약점 없음"이 아니며, 이미 받은 취약점 ID는 지우지 않는다.
+// 입력값만 읽고 이전 표를 보관하지 않으므로 조회 중·오류·새 결과에서 이전 표가 현재 결과처럼 남지 않는다.
+const SCAN_STATUS = {
+  complete: '모두 조회(complete)', partial: '일부 조회 실패(partial)', not_checked: '아직 조회 안 함(not_checked)',
+  not_configured: '조회 준비 미완료(not_configured)', unverifiable: 'lock 파일 확인 불가(unverifiable)',
+};
+const SCAN_NOTE = {
+  complete: '승인된 패키지의 조회가 모두 끝났습니다. OSV는 알려진 취약점 데이터베이스이며, 조회 결과가 없다는 사실만으로 해당 패키지나 앱 전체가 안전하다고 보장할 수 없습니다.',
+  partial: '일부 패키지 조회에 실패했습니다. 이미 받은 취약점 ID는 아래에 그대로 보여 주며, 전체 조회는 확인할 수 없습니다.',
+  not_checked: '승인된 공개 조회 대상이 없어 조회하지 않았습니다. 취약점 없음이 아닙니다.',
+  not_configured: '조회 대상 프로젝트 설정이 필요합니다(운영자가 준비). 취약점 없음이 아닙니다.',
+  unverifiable: 'package-lock.json을 확인할 수 없어 조회하지 못했습니다. 취약점 없음이 아닙니다.',
+};
+const PACKAGE_STATUS = { known_vulnerabilities: '알려진 항목 있음(known_vulnerabilities)', none_found: '알려진 항목 없음(none_found)', unverifiable: '조회 확인 불가(unverifiable)' };
+// 설치된 정확한 버전(예: 1.2.0)만 버전으로 보인다. ^1.2.0 같은 범위는 설치 버전이 아니다.
+const EXACT_VERSION = /^[0-9]+[.][0-9]+[.][0-9]+([-+][0-9A-Za-z.+-]+)?$/u;
+
+function packageRow(p) {
+  const exact = typeof p?.version === 'string' && EXACT_VERSION.test(p.version);
+  const row = node('li');
+  if (typeof p?.name === 'string' && p.name) row.setAttribute('data-student-package-name', p.name);
+  if (exact) row.setAttribute('data-student-package-version', p.version);
+  const known = Object.hasOwn(PACKAGE_STATUS, p?.status);
+  const findings = Array.isArray(p?.vulnerabilities) ? p.vulnerabilities : [];
+  row.append(node('span', `${shortText(p?.name) ?? '이름 확인 불가'} ${exact ? p.version : '버전 확인 불가(정확한 설치 버전 아님)'} · 상태: ${known ? PACKAGE_STATUS[p.status] : `확인 불가(${shortText(p?.status) ?? 'unknown'})`} · 출처: ${shortText(p?.source) ?? '확인 불가'} · 확인 시각: ${shortText(p?.checkedAt) ?? '확인 불가'}`));
+  const notes = [];
+  if (p?.status === 'none_found') notes.push('조회 범위에서 알려진 항목이 없다는 뜻이며, 안전하다는 보장은 아닙니다.');
+  if (p?.status === 'unverifiable') notes.push(findings.length ? '일부 확인·전체 조회 확인 불가. 받은 취약점 ID는 그대로 보여 줍니다.' : '조회를 확인할 수 없습니다. 취약점 없음이 아닙니다.');
+  const box = node('div');
+  box.append(...notes.map(line), ...findings.map((v) => line(`취약점 ID: ${shortText(v?.id) ?? '확인 불가'} · 수정 시각: ${shortText(v?.modified) ?? '확인 불가'}`)));
+  row.append(box);
+  return row;
+}
+
+function vulnerabilitiesView({ status, mode, data, error } = {}) {
+  const root = node('div');
+  root.append(node('h3', '설치 패키지와 알려진 취약점(OSV)'));
+  if (MODE[mode]) root.append(line(`자료 상태: ${MODE[mode]}`));
+  if (status === 'idle') root.append(line('조회 전'));
+  else if (status === 'loading') root.append(line('조회 중'));
+  else if (status === 'error') root.append(line(`조회 실패: ${safeMessage(error)}`), line(`코드: ${safeCode(error)}`), line('조회 실패는 취약점 없음이 아닙니다. 이전 표는 현재 결과가 아니어서 보여 주지 않습니다. 다시 조회는 제공 화면의 설치 패키지 조회 버튼을 직접 누르세요.'));
+  else if (status === 'ok' && data) {
+    const known = Object.hasOwn(SCAN_STATUS, data.status);
+    root.append(line(`조회 상태: ${known ? SCAN_STATUS[data.status] : `확인 불가(${shortText(data.status) ?? 'unknown'})`}`), line(known ? SCAN_NOTE[data.status] : '조회 상태를 확인할 수 없습니다. 취약점 없음이 아닙니다.'));
+    for (const [name, value] of [['lockfileVersion', data.lockfileVersion], ['lockfileHash', data.lockfileHash], ['확인 시각(checkedAt)', data.checkedAt]]) {
+      if (shortText(value) !== null) root.append(line(`${name}: ${value}`));
+    }
+    if (Number.isInteger(data.excluded?.count)) root.append(line(`조회 제외: ${data.excluded.count}건`));
+    const packages = Array.isArray(data.packages) ? data.packages : [];
+    const list = node('ul');
+    if (packages.length) list.append(...packages.map(packageRow));
+    root.append(node('h4', '패키지'), packages.length ? list : line('조회된 패키지가 없습니다(취약점 없음이 아닙니다).'));
+  } else root.append(line('확인 불가: 조회 상태를 알 수 없습니다. 취약점 없음이 아닙니다.'));
+  return root;
+}
+
 export function createStudentView() {
   return {
     renderIdentity({ me, devices, sessions } = {}) {
@@ -389,7 +445,7 @@ export function createStudentView() {
     },
     renderEvents(input) { return eventsView(input); },
     renderStatus(input) { return statusView(input); },
-    renderVulnerabilities() { return '학생 구현 대기: 정확한 설치 버전·OSV 출처·조회 시각·부분 결과·조회 실패를 구분하세요.'; },
+    renderVulnerabilities(input) { return vulnerabilitiesView(input); },
     renderAiConnection(input) { return aiConnectionView(input); },
     renderExplanation(input) { return explanationView(input); },
     renderAction(input) { return actionView(input); },
